@@ -4,5 +4,7 @@ angular.module('MainCtrl', []).controller('MainController', function($scope) {
 	$scope.$on('$routeChangeSuccess', function(){
     //Here your view content is fully loaded !!
     console.log('home screen loaded')
+    starthome();
+    
   });
 });

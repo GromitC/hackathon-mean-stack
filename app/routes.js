@@ -1,22 +1,35 @@
 var mongoose = require('mongoose');
 
+var _ = require('underscore')
+
+var tools =require('./tools/tools');
+
+tools.DataGrouper.register("sum", function(item) {
+	    return _.extend({}, item.key, {Value: _.reduce(item.vals, function(memo, node) {
+	        return memo + Number(node.Value);
+	    }, 0)});
+	});
 module.exports = function(app) {
-	var Players = mongoose.model('Players');
+	var Whd = mongoose.model('Whd');
 	// server routes ===========================================================
 	// handle things like api calls
 	// authentication routes
 
-	app.get('/getPlayer',function(req, res, next){
-		var queryPlayers = Players.find();
+	app.get('/getWhd',function(req, res, next){
+		var queryWhd = Whd.find({"latlng":{'$exists':true}},{"latlng":1}).limit(10000);;
 
-    	queryPlayers.exec(function (err, players){
+    	queryWhd.exec(function (err, whd){
       if (err) { 
         console.log(err)
         return next(err); 
       }
-      if (!players) { return next(new Error('can\'t find players')); }
-      req.players = players;
-      res.json(req.players);
+      if (!whd) { return next(new Error('can\'t find whd')); }
+
+      //console.log('start grouping')
+      //whd = tools.DataGrouper.sum(whd, ["latlng"])
+      //console.log('done grouping')
+      req.whd = whd;
+      res.json(req.whd);
     });
 
 	})

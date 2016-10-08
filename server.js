@@ -23,6 +23,7 @@ app.use(express.static(__dirname + '/public')); // set the static files location
 
 //models ===================================================
 require('./app/models/Player');
+require('./app/models/Whd');
 
 // routes ==================================================
 require('./app/routes')(app); // pass our application into our routes
