@@ -1,15 +1,21 @@
 // Define a class like this
 createMap=function(id){
-
+$.getJSON(window.location.href+'getDictionary/',function(_dict){
+	_dict=_dict.filter(function(d){
+		return d["Column Name"].slice(-3)=='amt' || d["Column Name"].slice(-3)=='cnt'
+	})
+	//console.log(_dict)
+$.getJSON(window.location.href+'getInspection/',function(_dataI){
+$.getJSON(window.location.href+'getLegal/',function(_dataL){
+$.getJSON(window.location.href+'getComplaint/',function(_dataC){
 	$.getJSON(window.location.href+'getWhd/'
               // +'?minDate='+stringMinDate
               // +'&maxDate='+stringMaxDate
               // +'&keyword='+keyword
     ,function(_data) {
-
     	var heatmapData={}
 
-    	function reformat(array) {
+    	function reformat(array,classType) {
                 var data = [];
                 array.map(function (d, i) {
                 	if (d.latlng in heatmapData){
@@ -19,7 +25,11 @@ createMap=function(id){
                 	}
                     data.push({
                         id: i,
+                        otherInfo: d,
+                        class:classType,
                         type: "Feature",
+                        trade_nm: d['trade_nm'],
+                        rating: d['rating'],
                         geometry: {
                             coordinates: [+parseFloat(d.latlng.split(',')[1]), +parseFloat(d.latlng.split(',')[0])],
                             type: "Point"
@@ -31,7 +41,13 @@ createMap=function(id){
                 return data;
             }
 
-        var geoData = { type: "FeatureCollection", features: reformat(_data) };
+        var geoData = { type: "FeatureCollection", features: reformat(_data,'normalDots')
+        													.concat(reformat(_dataI,'CompliantDots')
+        														.concat(reformat(_dataL,'LegalDots')
+        														.concat(reformat(_dataC,'InspectionDots')))) };
+
+
+
 
         //console.log(reformat(_data))
         var qtree = d3.geom.quadtree(geoData.features.map(function (data, i) {
@@ -135,7 +151,30 @@ createMap=function(id){
 
             var lasso = L.lassoSelect().addTo(leafletMap);
 
-            lasso.enable();
+            $( "#mapSelect" ).change(function() {
+            	if(document.getElementById('mapSelect').checked){
+            		lasso.enable();
+            		// Disable drag and zoom handlers.
+				    leafletMap.dragging.disable();
+				    leafletMap.touchZoom.disable();
+				    leafletMap.doubleClickZoom.disable();
+				    leafletMap.scrollWheelZoom.disable();
+            	}else{
+            		lasso.reset();
+            		lasso.disable();
+            		var mapBounds = leafletMap.getBounds();
+                    // Disable drag and zoom handlers.
+				    leafletMap.dragging.enable();
+				    leafletMap.touchZoom.enable();
+				    leafletMap.doubleClickZoom.enable();
+				    leafletMap.scrollWheelZoom.enable();
+	                var subset = search(qtree, mapBounds.getWest(), mapBounds.getSouth(), mapBounds.getEast(), mapBounds.getNorth());
+	                redrawSubset(subset);
+            	}
+			  
+			});
+
+            
 
             lasso.on('pathchange', function(){
 
@@ -151,6 +190,7 @@ createMap=function(id){
 			   		 }
 			   		}
 				redrawSubset(subsubset);
+				barChart('#barChart',subsubset);
 
 			});
 
@@ -162,11 +202,7 @@ createMap=function(id){
 
 
 
-            // Disable drag and zoom handlers.
-		    leafletMap.dragging.disable();
-		    leafletMap.touchZoom.disable();
-		    leafletMap.doubleClickZoom.disable();
-		    leafletMap.scrollWheelZoom.disable();
+
 
             L.tileLayer("http://{s}.tiles.wmflabs.org/bw-mapnik/{z}/{x}/{y}.png").addTo(leafletMap);
 
@@ -211,6 +247,38 @@ createMap=function(id){
             }
 
             function redrawSubset(subset) {
+            	        var wordC={}
+            	        var wordI={}
+            	        var wordL={}
+            	var tmp=subset.filter(function(d){return d.class!=="normalDots"})
+		        for (var i=0;i<tmp.length;i++){
+		        	for(var j=0;j<_dict.length;j++){
+		        		if(tmp[i]['otherInfo'][_dict[j]['Column Name']]>0){
+		        			if(tmp[i].class==='CompliantDots'){
+		        				if(!(_dict[j]['Column Name'] in wordC)){
+		        					wordC[_dict[j]['Display Name']]=[tmp[i]['otherInfo'][_dict[j]['Column Name']]]
+		        				}else{
+		        					wordC[_dict[j]['Display Name']].push(tmp[i]['otherInfo'][_dict[j]['Column Name']])
+		        				}
+		        			}
+		        			if(tmp[i].class==='LegalDots'){
+		        				if(!(_dict[j]['Display Name'] in wordL)){
+		        					wordL[_dict[j]['Display Name']]=[tmp[i]['otherInfo'][_dict[j]['Column Name']]]
+		        				}else{
+		        					wordL[_dict[j]['Display Name']].push(tmp[i]['otherInfo'][_dict[j]['Column Name']])
+		        				}
+		        			}
+		        			if(tmp[i].class==='InspectionDots'){
+		        				if(!(_dict[j]['Display Name'] in wordI)){
+		        					wordI[_dict[j]['Display Name']]=[tmp[i]['otherInfo'][_dict[j]['Column Name']]]
+		        				}else{
+		        					wordI[_dict[j]['Display Name']].push(tmp[i]['otherInfo'][_dict[j]['Column Name']])
+		        				}
+		        			}
+		        		}
+		        	}
+		        }
+		       	wordlist("#wordList",wordC,wordL,wordI)
                 path.pointRadius(5);// * scale);
                 //path.pointRadius(function(d) { return d.properties.mag; });
 
@@ -236,7 +304,7 @@ createMap=function(id){
                                   return d.id;
                               });
 
-                points.enter().append("path");
+                points.enter().append("path").attr('class',function(d){return d['class']});
                 points.exit().remove();
                 points.attr("d", path);
 
@@ -259,7 +327,12 @@ createMap=function(id){
                 //console.log(subset)
 
                 redrawSubset(subset);
+                barChart('#barChart',subset);
             }
 
         })
+	})
+})
+})
+})
 }
